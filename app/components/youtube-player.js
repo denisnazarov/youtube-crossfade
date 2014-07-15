@@ -12,6 +12,12 @@ var playerVars = {
 };
 
 export default Ember.Component.extend({
+  setupDeferred: function(){
+    this._playerDeferred = Ember.RSVP.defer();
+    this._playerLoaded = this._playerDeferred.promise;
+    this._super();
+  }.on('init'),
+
   classNames: ['youtube-player'],
 
   videoId: null, //set in template
@@ -35,10 +41,16 @@ export default Ember.Component.extend({
 
   currentTimeObserver: function(){
     var currentTime = this.get('currentTime');
+    var videoStart = this.get('videoStart');
     var videoEnd = this.get('videoEnd');
+    var player = this.get('player');
 
     if (currentTime > videoEnd){
-      this.videoEnded();
+      player.seekTo(videoStart);
+      if (!this.get('hasEnded')){
+        this.videoEnded();
+      }
+      this.set('hasEnded', true);
     }
   }.observes('currentTime'),
 
@@ -50,13 +62,15 @@ export default Ember.Component.extend({
 
     playerVars.start = videoStart;
 
+
     new YT.Player(elementId, {
       playerVars: playerVars,
       events: {
         onReady: function(event){
           var player = event.target;
-          player.mute();
+          //player.mute();
           Ember.run(function(){
+            self._playerDeferred.resolve();
             self.set('player', player);
             self.changeVideoToCurrent();
           });
@@ -67,9 +81,18 @@ export default Ember.Component.extend({
               PAUSED = YT.PlayerState.PAUSED,
               state = e.data;
 
-          if (state === ENDED){
-            Ember.run(self, 'videoEnded');
+          if (state === PLAYING){
+            Ember.run(self, function(){
+              var self = this;
+              this._loadingDeferred.resolve();
+            });
           }
+          //if (state === ENDED){
+            //if (!self.get('hasEnded')){
+              //Ember.run(self, 'videoEnded');
+            //}
+            //self.set('hasEnded', true);
+          //}
         }
       }
     });
@@ -84,7 +107,7 @@ export default Ember.Component.extend({
   }.observes('videoId'),
 
   videoEnded: function(){
-    this.stopEndPoll();
+    //this.stopEndPoll();
     this.sendAction('ended');
   },
 
@@ -97,5 +120,24 @@ export default Ember.Component.extend({
   },
   willDestroyElement: function(){
     this.stopEndPoll();
+  },
+  loadVideo: function(video){
+    var self = this;
+    this._playerLoaded.then(function(){
+      self.set('hasEnded', false);
+      self.setProperties({
+        videoStart: video.startTime,
+        videoEnd: video.endTime,
+        videoId: video.videoId
+      });
+    });
+    this._loadingDeferred = Ember.RSVP.defer();
+    this._loadingDeferred.promise.then(function(){
+      self.$().css('opacity', 1);
+    });
+    return this._loadingDeferred.promise;
+  },
+  unloadVideo: function(){
+    this.$().css('opacity', 0);
   }
 });
