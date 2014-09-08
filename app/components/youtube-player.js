@@ -31,7 +31,9 @@ export default Ember.Component.extend({
     var player = this.get('player');
 
     this._intervalId = window.setInterval(function(){
-      self.set('currentTime', player.getCurrentTime());
+      Ember.run(self, function(){
+        this.set('currentTime', player.getCurrentTime());
+      });
     }, 100);
   },
 
@@ -57,45 +59,38 @@ export default Ember.Component.extend({
   setupYouTubeApi: function(){
     var self = this;
     var elementId = this.get('elementId');
-    var videoStart = this.get('videoStart');
     var YT = window.YT;
 
-    playerVars.start = videoStart;
+    function readyHandler(event){
+      var player = event.target;
+      player.mute();
+      Ember.run(self, function(){
+        this._playerDeferred.resolve();
+        this.set('player', player);
+        this.changeVideoToCurrent();
+      });
+    }
 
+    function stateChangeHandler(event){
+      var PLAYING = YT.PlayerState.PLAYING,
+          state = event.data;
 
-    new YT.Player(elementId, {
+      if (state === PLAYING){
+        Ember.run(self, function(){
+          this._loadingDeferred.resolve();
+        });
+      }
+    }
+
+    var options = {
       playerVars: playerVars,
       events: {
-        onReady: function(event){
-          var player = event.target;
-          //player.mute();
-          Ember.run(function(){
-            self._playerDeferred.resolve();
-            self.set('player', player);
-            self.changeVideoToCurrent();
-          });
-        },
-        onStateChange: function(e){
-          var ENDED = YT.PlayerState.ENDED,
-              PLAYING = YT.PlayerState.PLAYING,
-              PAUSED = YT.PlayerState.PAUSED,
-              state = e.data;
-
-          if (state === PLAYING){
-            Ember.run(self, function(){
-              var self = this;
-              this._loadingDeferred.resolve();
-            });
-          }
-          //if (state === ENDED){
-            //if (!self.get('hasEnded')){
-              //Ember.run(self, 'videoEnded');
-            //}
-            //self.set('hasEnded', true);
-          //}
-        }
+        onReady: readyHandler,
+        onStateChange: stateChangeHandler
       }
-    });
+    };
+
+    new YT.Player(elementId, options);
   },
 
   changeVideoToCurrent: function(){
