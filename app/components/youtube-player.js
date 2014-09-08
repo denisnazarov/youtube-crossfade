@@ -12,6 +12,9 @@ var playerVars = {
 };
 
 export default Ember.Component.extend({
+  templateName: 'components/youtube-player',
+  classNameBindings: ['isWidescreen:widescreen:fullscreen'],
+  isWidescreen: Ember.computed.equal('aspectRatio', 'widescreen'),
   setupDeferred: function(){
     this._playerDeferred = Ember.RSVP.defer();
     this._playerLoaded = this._playerDeferred.promise;
@@ -58,7 +61,7 @@ export default Ember.Component.extend({
 
   setupYouTubeApi: function(){
     var self = this;
-    var elementId = this.get('elementId');
+    var element = this.$('.video-player')[0];
     var YT = window.YT;
 
     function readyHandler(event){
@@ -90,7 +93,7 @@ export default Ember.Component.extend({
       }
     };
 
-    new YT.Player(elementId, options);
+    new YT.Player(element, options);
   },
 
   changeVideoToCurrent: function(){
@@ -123,7 +126,8 @@ export default Ember.Component.extend({
       self.setProperties({
         videoStart: video.startTime,
         videoEnd: video.endTime,
-        videoId: video.videoId
+        videoId: video.videoId,
+        aspectRatio: video.aspectRatio
       });
     });
     this._loadingDeferred = Ember.RSVP.defer();
